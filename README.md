@@ -63,7 +63,7 @@ that shift against the pretrained baseline on held-out references.
    `load_dataset("mdwiratathya/ROCO-radiology")` — no manual download.
 4. Inspects the dataset (splits, columns, caption length distribution)
    and auto-detects the image and caption column names.
-5. Filters captions to a 10–120 word window and subsets 8,000 training
+5. Filters captions to a 5–60 word window and subsets 8,000 training
    and 1,000 validation examples (seed = 42).
 6. Downloads the BLIP base checkpoint and processor from HuggingFace.
 7. Fine-tunes BLIP end-to-end (full model by default; a single flag
@@ -99,7 +99,7 @@ ROCO (Radiology Objects in COntext) is a large collection of
 radiology-related figures scraped from open-access articles on PubMed
 Central. Each example is an image paired with the caption the paper
 authors wrote for that figure. Captions are natural language and
-vary in length and style, which is why we filter to 10–120 words
+vary in length and style, which is why we filter to 5–60 words
 before training. The `mdwiratathya/ROCO-radiology` release on
 HuggingFace is a cleaned radiology-only variant and is what this
 notebook consumes.
@@ -185,7 +185,7 @@ quickly or running a quota-constrained session.
 | scheduler | cosine + 5% warmup | smooth decay, no manual step tuning |
 | weight decay | 0.01 | AdamW default, mild regulariser |
 | grad clip | 1.0 | prevents rare fp16 loss spikes |
-| max target len | 128 | covers >99% of captions after 10–120 word filter |
+| max target len | 80 | covers >99% of captions after 5–60 word filter |
 | precision | fp16 | ~2× throughput, half the VRAM |
 | seed | 42 | reproducible shuffles + subset selection |
 
@@ -207,13 +207,40 @@ after generating captions with `num_beams=4`.
 
 | Metric | Pretrained BLIP | Fine-tuned BLIP | Δ |
 |---|---|---|---|
-| BLEU-4 | _TBD_ | _TBD_ | _TBD_ |
-| METEOR | _TBD_ | _TBD_ | _TBD_ |
-| BERTScore-F1 | _TBD_ | _TBD_ | _TBD_ |
+| BLEU-4 | 0.0011 | 0.0324 | +0.0313 |
+| METEOR | 0.0347 | 0.1644 | +0.1297 |
+| BERTScore-F1 | 0.7041 | 0.7806 | +0.0765 |
 
-Filled in after running the notebook — `metrics.csv` is written to
-`/content/blip_roco_outputs/metrics.csv` and the loss curve to
-`/content/blip_roco_outputs/plots/loss_curves.png`.
+All three metrics improve substantially after fine-tuning on radiology
+data. The METEOR gain (+0.13) is the most meaningful signal: it
+captures synonym and stem matches, reflecting genuine domain vocabulary
+acquisition rather than surface n-gram overlap. BERTScore-F1 climbs
+from 0.70 to 0.78, confirming semantic alignment with reference
+captions. BLEU-4 starts near zero for the pretrained model (general
+captions share almost no 4-grams with radiology text) and rises to
+0.032 after fine-tuning.
+
+`metrics.csv` is written to `/content/blip_roco_outputs/metrics.csv`
+and the loss curve to `/content/blip_roco_outputs/plots/loss_curves.png`.
+
+### Training run details
+
+| stat | value |
+|---|---|
+| total wall-clock time | ~52 minutes (Colab T4) |
+| best epoch | 3 (val loss 3.1908) |
+| epoch 1 train / val loss | 4.3757 / 3.5434 |
+| epoch 2 train / val loss | 3.1313 / 3.2800 |
+| epoch 3 train / val loss | 2.6602 / 3.1908 ← best |
+| epoch 4 train / val loss | 2.3042 / 3.1930 |
+| epoch 5 train / val loss | 2.0988 / 3.2236 |
+| trainable parameters | 247.4 M / 247.4 M (100 %) |
+| final zip size | 917.7 MB |
+
+Val loss stops improving after epoch 3 while train loss continues to
+fall — mild overfitting on 8k examples at epoch 4+. The best-val
+checkpoint (epoch 3) is what gets saved to `blip-roco-finetuned/` and
+zipped.
 
 ---
 
@@ -222,6 +249,7 @@ Filled in after running the notebook — `metrics.csv` is written to
 | file | purpose |
 |---|---|
 | `blip_roco_finetune.ipynb` | the single self-contained Colab notebook (all installs, dataset loading, training, evaluation, and model export) |
+| `blip-roco-finetuned.zip` | the fine-tuned model weights + processor exported from the completed training run (917.7 MB); load directly with `BlipForConditionalGeneration.from_pretrained` after unzipping — no retraining needed for deployment |
 | `README.md` | this file |
 
 ## How to run
@@ -251,11 +279,10 @@ After a successful run, `/content/blip_roco_outputs/` contains:
 | `metrics.csv` | BLEU-4 / METEOR / BERTScore table (pretrained vs fine-tuned) |
 | `training_artifacts.zip` | small bundle of the plots + metrics.csv |
 
-## Loading the saved model later (e.g. for a Gradio / HF Spaces demo)
+## Loading the saved model for deployment (Gradio / HF Spaces)
 
-The fine-tuned model is saved in standard HuggingFace format, so any
-deployment framework can load it with two lines. Example (this code
-would live in the separate deployment notebook, not here):
+`blip-roco-finetuned.zip` is already in this repository. Unzip it and
+load with two lines — no retraining needed:
 
 ```python
 from transformers import BlipProcessor, BlipForConditionalGeneration
@@ -268,21 +295,25 @@ from PIL import Image
 img = Image.open("xray.png").convert("RGB")
 ids = model.generate(
     **processor(img, return_tensors="pt"),
-    num_beams=4, max_new_tokens=128,
+    num_beams=4, max_new_tokens=80,
 )
 print(processor.decode(ids[0], skip_special_tokens=True))
 ```
 
 The zip contains a standard HuggingFace model directory —
 `config.json`, `preprocessor_config.json`, tokenizer files, and
-`model.safetensors`.
+`model.safetensors` (weights from the best-val epoch). A Gradio or
+Mesop demo only needs to download and unzip this file, then call
+`from_pretrained` — no GPU required for inference on a single image.
 
 ---
 
 ## Screenshots / demo
 
-_To be added after the notebook is run and the separate deployment
-demo is recorded._
+Training outputs (loss curves, qualitative side-by-side caption
+comparisons, and the metrics CSV) are produced inside Colab at
+`/content/blip_roco_outputs/plots/`. Screenshots and a demo video
+will be added once the Gradio deployment is complete.
 
 ## References
 
