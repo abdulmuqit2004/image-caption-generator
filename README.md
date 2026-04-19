@@ -223,6 +223,39 @@ captions share almost no 4-grams with radiology text) and rises to
 `metrics.csv` is written to `/content/blip_roco_outputs/metrics.csv`
 and the loss curve to `/content/blip_roco_outputs/plots/loss_curves.png`.
 
+## Deployment
+
+The fine-tuned model is deployed as an interactive Gradio demo on HuggingFace Spaces.
+
+🔗 **Live demo:** https://huggingface.co/spaces/maxheen/Radiology_Image_Caption_Generator
+
+### What the demo does
+- Upload any radiology image (X-ray, CT, MRI, ultrasound) or pick one from the built-in ROCO test set gallery (25 images, click to caption)
+- Generates two captions side by side, pretrained BLIP baseline vs fine-tuned BLIP
+- Shows inference time per model
+
+### Deployment stack
+| component | choice |
+|---|---|
+| UI framework | Gradio 4.x (`gr.Blocks`) |
+| Hosting | HuggingFace Spaces (free CPU tier) |
+| Inference | PyTorch CPU (fp32); ~10–30s per image on free tier |
+| Model weights | `blip-roco-finetuned/` (917 MB, git-lfs tracked) |
+
+### Files added for deployment
+| file | purpose |
+|---|---|
+| `app.py` | Gradio app — loads both models, serves the UI, handles gallery selection |
+| `requirements.txt` | `gradio`, `transformers`, `torch`, `Pillow`, `accelerate`, `datasets` |
+| `blip-roco-finetuned/` | Fine-tuned weights, loaded at startup via `from_pretrained` |
+
+### Running the demo locally
+```bash
+pip install gradio transformers torch Pillow datasets
+python app.py
+```
+Then open `http://localhost:7860`. The `blip-roco-finetuned/` folder must be in the same directory as `app.py`.
+
 ### Training run details
 
 | stat | value |
