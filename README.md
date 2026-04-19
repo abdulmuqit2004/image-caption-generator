@@ -341,12 +341,27 @@ Mesop demo only needs to download and unzip this file, then call
 
 ---
 
-## Screenshots / demo
+## Presentation & Video Links
 
-Training outputs (loss curves, qualitative side-by-side caption
-comparisons, and the metrics CSV) are produced inside Colab at
-`/content/blip_roco_outputs/plots/`. Screenshots and a demo video
-will be added once the Gradio deployment is complete.
+* **Project Presentation Slides:** ![Presentation Slides](presentation_slides.pdf)
+* **Video Presentation:** [https://drive.google.com/file/d/18lGRA-zj2tyWPcYos9ZT0JEOVpru5SJL/view?usp=sharing]
+
+---
+
+## Screenshots & Demo
+
+**Training Convergence** The following graph displays the training versus validation loss over our 5-epoch fine-tuning run. The model reached its best validation checkpoint at Epoch 3.
+
+![Training Loss Curve](images/loss_curves_presentation.png)
+
+**Live Application Demo** Below is a look at our live interactive Gradio application deployed on Hugging Face Spaces. It allows users to upload a scan or select from our test gallery to view side-by-side inference generation.
+
+![Gradio App Demo](images/gradio_UI.png)
+
+**Qualitative Results** The fine-tuned model successfully learned the medical domain vocabulary, achieving significant improvements in semantic alignment over the baseline model.
+
+![X-Ray Inference Example](images/x-ray_example.png)
+![MRI Inference Example](images/MRI_example.png)
 
 ## References
 
